@@ -98,8 +98,36 @@ class BaseProp:
         return 2.0*np.pi*self.get_torque_coef(w, V)
 
 
+    def get_figure_of_merit(self, w, V):
+        """Returns the hover figure of merit for the prop at the given angular
+        velocity and freestream velocity.
+
+        Parameters
+        ----------
+        w : float
+            Angular velocity of the prop in radians per second.
+
+        V : float
+            Freestream velocity in feet per second.
+
+        Returns
+        -------
+        float
+            Figure of merit (dimensionless).
+        """
+        C_T = self.get_thrust_coef(w, V)
+        C_P = self.get_power_coef(w, V)
+
+        if C_T <= 0 or C_P <= 0:
+            return np.nan
+
+        return np.sqrt(2.0/np.pi)*C_T**1.5/C_P
+    
+    
     def plot_coefs(self, rpm_lims=[0.0, 35000.0], J_lims=[0.0, 1.4]):
         """Plot thrust and torque coefficients as functions of rpm and advance ratio.
+        Click any point on either plot to print its RPM, J, thrust coef, power coef,
+        and figure of merit.
 
         Parameters
         ----------
@@ -114,44 +142,82 @@ class BaseProp:
         rpms = np.linspace(rpm_lims[0], rpm_lims[1], 10)
         Js = np.linspace(J_lims[0], J_lims[1], 10)
 
+        # Flattened storage so scatter index <-> data point is exact
+        flat_rpm = []
+        flat_J = []
+        flat_w = []
+        flat_V = []
+        flat_thrust = []
+        flat_power = []
+
+        # Loop through all rpm/J combinations once
+        for rpm in rpms:
+            w = to_rads(rpm)
+            for J in Js:
+                V = self.get_velocity(rpm, J)
+
+                if w <= 0:
+                    thrust = np.nan
+                    power = np.nan
+                else:
+                    try:
+                        thrust = self.get_thrust_coef(w, V)
+                    except PropDataBoundsError:
+                        thrust = np.nan
+                    try:
+                        power = self.get_power_coef(w, V)
+                    except PropDataBoundsError:
+                        power = np.nan
+
+                flat_rpm.append(rpm)
+                flat_J.append(J)
+                flat_w.append(w)
+                flat_V.append(V)
+                flat_thrust.append(thrust)
+                flat_power.append(power)
+
+        flat_rpm = np.array(flat_rpm)
+        flat_J = np.array(flat_J)
+        flat_thrust = np.array(flat_thrust)
+        flat_power = np.array(flat_power)
+
         # Initialize figure
         fig = plt.figure(figsize=plt.figaspect(1.))
         fig.suptitle(self.name)
-        ax = fig.add_subplot(1,2,1, projection='3d')
 
-        # Loop through rpm values to plot thrust
-        for rpm in rpms:
-            thrust = np.zeros_like(Js)
-            for i, J in enumerate(Js):
-                w = to_rads(rpm)
-                V = self.get_velocity(rpm, J)
-                thrust[i] = self.get_thrust_coef(w, V)
-            rpms_to_plot = np.full(len(thrust), rpm)
-            ax.plot(Js, rpms_to_plot, thrust, 'r-')
+        # Thrust plot
+        ax_thrust = fig.add_subplot(1,2,1, projection='3d')
+        thrust_scatter = ax_thrust.scatter(flat_J, flat_rpm, flat_thrust, c='r', picker=True, pickradius=5)
+        ax_thrust.set_title("Predicted Thrust")
+        ax_thrust.set_xlabel("Advance Ratio")
+        ax_thrust.set_ylabel("RPM")
+        ax_thrust.set_zlabel("Thrust Coefficient")
 
-        # Format figure
-        ax.set_title("Predicted Thrust")
-        ax.set_xlabel("Advance Ratio")
-        ax.set_ylabel("RPM")
-        ax.set_zlabel("Thrust Coefficient")
+        # Power plot
+        ax_power = fig.add_subplot(1,2,2, projection='3d')
+        power_scatter = ax_power.scatter(flat_J, flat_rpm, flat_power, c='r', picker=True, pickradius=5)
+        ax_power.set_title("Predicted Power")
+        ax_power.set_xlabel("Advance Ratio")
+        ax_power.set_ylabel("RPM")
+        ax_power.set_zlabel("Power Coefficient")
 
-        ax = fig.add_subplot(1,2,2, projection='3d')
+        # Pick handler - works for either subplot since both use the same flat arrays
+        def on_pick(event):
+            ind = event.ind[0]
+            rpm = flat_rpm[ind]
+            J = flat_J[ind]
+            w = flat_w[ind]
+            V = flat_V[ind]
 
-        # Loop through rpm values to plot torque
-        for rpm in rpms:
-            power = np.zeros_like(Js)
-            for i, J in enumerate(Js):
-                w = to_rads(rpm)
-                V = self.get_velocity(rpm, J)
-                power[i] = self.get_power_coef(w, V)
-            rpms_to_plot = np.full(len(power), rpm)
-            ax.plot(Js, rpms_to_plot, power, 'r-')
+            try:
+                fm = self.get_figure_of_merit(w, V)
+                print("RPM: {0:.1f}, J: {1:.3f}, C_T: {2:.4f}, C_P: {3:.4f}, FM: {4:.4f}".format(
+                    rpm, J, flat_thrust[ind], flat_power[ind], fm))
+            except PropDataBoundsError:
+                print("RPM: {0:.1f}, J: {1:.3f} -> Out of data range".format(rpm, J))
 
-        # Format
-        ax.set_title("Predicted Power")
-        ax.set_xlabel("Advance Ratio")
-        ax.set_ylabel("RPM")
-        ax.set_zlabel("Power Coefficient")
+        fig.canvas.mpl_connect('pick_event', on_pick)
+
         plt.show()
 
 

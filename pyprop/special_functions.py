@@ -159,11 +159,11 @@ def create_component_from_database(**kwargs):
         if I_max is not None:
             if isinstance(I_max, list):
                 if "where" in command:
-                    command = command+" and I_motorax between {0} and {1} order by RANDOM() limit 1".format(min(I_max), max(I_max))
+                    command = command+" and Imax between {0} and {1} order by RANDOM() limit 1".format(min(I_max), max(I_max))
                 else:
-                    command = command+" where I_motorax between {0} and {1} order by RANDOM() limit 1".format(min(I_max), max(I_max))
+                    command = command+" where Imax between {0} and {1} order by RANDOM() limit 1".format(min(I_max), max(I_max))
             else:
-                command = command+" order by abs({0}-I_motorax)".format(I_max)
+                command = command+" order by abs({0}-Imax)".format(I_max)
 
     # Motor
     elif component_type == "motor":

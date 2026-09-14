@@ -144,7 +144,7 @@ class Optimizer:
             data = pool.map(self._evaluate_random_unit, args)
 
         # Package results
-        t_flight, throttles, units, P_e, P_p, eff, cruise_thrust, max_thrust, max_power_to_weight = map(list,zip(*data))
+        t_flight, throttles, units, P_e, P_p, eff, cruise_thrust, max_thrust, max_power_to_weight, FM = map(list,zip(*data))
         t_flight = np.asarray(t_flight)
         throttles = np.asarray(throttles)
         units = np.asarray(units)
@@ -154,6 +154,7 @@ class Optimizer:
         cruise_thrust = np.asarray(cruise_thrust)
         max_thrust = np.asarray(max_thrust)
         max_power_to_weight = np.asarray(max_power_to_weight)
+        FM = np.asarray(FM)
 
         # Determine optimum
         max_ind = np.argmax(t_flight)
@@ -176,6 +177,7 @@ class Optimizer:
         print("    Power drawn: {0} W".format(P_e[max_ind]))
         print("    Power developed: {0} lbf*ft/s ({1} W)".format(P_p[max_ind], P_p[max_ind]/0.7375621494575464))
         print("    Propulsive efficiency: {0}%".format(eff[max_ind]*100.0))
+        print("    Figure of Merit: {0}".format(FM[max_ind]))
         print("    Cruise thrust: {0} lbf".format(cruise_thrust[max_ind]))
         print("    Max thrust (at 100% throttle): {0} lbf".format(max_thrust[max_ind]))
         print("    Max power-to-weight (at 100% throttle): {0} W/lbf".format(max_power_to_weight[max_ind]))
@@ -219,6 +221,7 @@ class Optimizer:
                 print("    Power drawn: {0} W".format(P_e[ind]))
                 print("    Power developed: {0} lbf*ft/s ({1} W)".format(P_p[ind], P_p[ind]/0.7375621494575464))
                 print("    Propulsive efficiency: {0}%".format(eff[ind]*100.0))
+                print("    Figure of Merit: {0}".format(FM[ind]))
                 print("    Cruise thrust: {0} lbf".format(cruise_thrust[ind]))
                 print("    Max thrust (at 100% throttle): {0} lbf".format(max_thrust[ind]))
                 print("    Max power-to-weight (at 100% throttle): {0} W/lbf".format(max_power_to_weight[ind]))
@@ -297,7 +300,7 @@ class Optimizer:
                 sorted_indices = np.argsort(t_flight)
                 for i in sorted_indices[::-1]:
                     curr_unit = units[i]
-                    row = "{:<25.10}{:<25.10}{:<25.10}{:<25.10}{:<25.10}{:<25.10}{:<25.10}{:<25}{:<25}{:<25.10}{:<25.10}{:<45}{:<25}{:<25.10}{:<35}{:<25}{:<35}{:<25}{:<25.10}{:<25.10}{:<25.10}"
+                    row = "{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25}{:<25}{:<25.10f}{:<25.10f}{:<45}{:<25}{:<25.10f}{:<35}{:<25}{:<35}{:<25}{:<25.10f}{:<25.10f}{:<25.10f}"
                     row = row.format(t_flight[i], throttles[i]*100.0, P_e[i]/curr_unit.batt.V0, P_e[i], P_p[i], eff[i]*100.0, cruise_thrust[i], curr_unit.prop.name,
                                      curr_unit.prop.manufacturer, curr_unit.prop.diameter, curr_unit.prop.pitch, curr_unit.motor.name, curr_unit.motor.manufacturer,
                                      curr_unit.motor.Kv, curr_unit.esc.name, curr_unit.esc.manufacturer, curr_unit.batt.name, curr_unit.batt.manufacturer, curr_unit.batt.V0,
@@ -360,6 +363,7 @@ class Optimizer:
                     P_e_cruise = curr_unit.get_electric_power()
                     P_p_cruise = V_req*T_req
                     eff = P_p_cruise/(P_e_cruise*0.7375621494575464)
+                    FM_cruise = curr_unit.get_figure_of_merit()
 
             # Anything that goes wrong just means this particular combination isn't up to snuff
             except ZeroDivisionError:
@@ -385,7 +389,8 @@ class Optimizer:
                 T_max = np.nan
 
         # Return params
-        return t_flight_cruise, thr_cruise, curr_unit, P_e_cruise, P_p_cruise, eff, T_req, T_max, power_to_weight_max
+        print(f"Evaluated unit: Prop: {curr_unit.prop.name}, Motor: {curr_unit.motor.name}, Battery: {curr_unit.batt.name}, ESC: {curr_unit.esc.name}, Flight Time: {t_flight_cruise} min, Throttle: {thr_cruise*100.0}%, Cruise Thrust: {thr_cruise} lbf, Max Thrust: {T_max} lbf, Max Power-to-Weight: {power_to_weight_max} W/lbf, Figure of Merit: {FM_cruise}")
+        return t_flight_cruise, thr_cruise, curr_unit, P_e_cruise, P_p_cruise, eff, T_req, T_max, power_to_weight_max, FM_cruise
 
 
     def _get_thrust_from_power_ratio(self, power_ratio, weight, V):

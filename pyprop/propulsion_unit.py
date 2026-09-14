@@ -108,6 +108,7 @@ class PropulsionUnit:
         # Check for zero inputs, in which case the thrust is zero. Obviously.
         if v_cruise == 0.0 and throttle == 0.0:
             self._w = 0.0
+            self._v = v_cruise
             return 0.0
 
         #Determine the shaft angular velocity at which the motor torque and propeller torque are matched
@@ -168,6 +169,7 @@ class PropulsionUnit:
         
         Ct = self.prop.get_thrust_coef(w_2, v_cruise)
         self._w = w_2
+        self._v = v_cruise
         self.calc_motor_torque(throttle, to_rpm(w_2)) # To make sure member variables are fully updated
 
         return Ct*self._rho*(w_2/(2*np.pi))**2*d**4
@@ -363,6 +365,20 @@ class PropulsionUnit:
 
         """
         return self.I_motor*self.batt.V0
+
+
+    def get_figure_of_merit(self):
+        """Returns the figure of merit for the propulsion unit at the last
+        calculated flight condition (i.e. after calling calc_cruise_thrust,
+        calc_cruise_throttle, or calc_batt_life).
+
+        Returns
+        -------
+        float
+            Figure of merit (dimensionless).
+
+        """
+        return self.prop.get_figure_of_merit(self._w, self._v)
 
 
     def __str__(self):
