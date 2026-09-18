@@ -297,7 +297,7 @@ class Optimizer:
                 print(header, file=export_file)
 
                 # Loop through flight times from greater to least
-                sorted_indices = np.argsort(t_flight)
+                sorted_indices = np.argsort(eff)
                 for i in sorted_indices[::-1]:
                     curr_unit = units[i]
                     row = "{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25.10f}{:<25}{:<25}{:<25.10f}{:<25.10f}{:<45}{:<25}{:<25.10f}{:<35}{:<25}{:<35}{:<25}{:<25.10f}{:<25.10f}{:<25.10f}"

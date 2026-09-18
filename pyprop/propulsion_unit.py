@@ -82,7 +82,6 @@ class PropulsionUnit:
 
         # Determine torque
         return self.motor.Kt*self.motor.Gr*(self.I_motor-self.motor.I0)
-
     
     def calc_cruise_thrust(self, v_cruise, throttle, max_iter=1000):
         """Computes thrust produced at a given cruise speed and throttle setting.
@@ -379,7 +378,33 @@ class PropulsionUnit:
 
         """
         return self.prop.get_figure_of_merit(self._w, self._v)
+    
+    def get_motor_efficiency(self):
+        """Returns the motor's electrical-to-mechanical efficiency for the last
+        calculated flight condition (i.e. after calling calc_cruise_thrust,
+        calc_cruise_throttle, or calc_batt_life).
 
+        Returns
+        -------
+        float
+            Motor efficiency (dimensionless, 0 to 1). Does not include ESC
+            or battery losses.
+
+        """
+        revs = to_rpm(self._w)
+
+        # Voltage at the motor terminals (back-EMF + I*R drop across motor resistance only)
+        V_motor = (self.motor.Gr/self.motor.Kv)*revs + self.I_motor*self.motor.R
+        P_elec = V_motor*self.I_motor
+
+        # Torque, recomputed the same way calc_motor_torque does it
+        tau = self.motor.Kt*self.motor.Gr*(self.I_motor - self.motor.I0)
+        P_mech = tau*self._w
+
+        if P_elec <= 0:
+            return 0.0
+
+        return P_mech/P_elec
 
     def __str__(self):
         string = "----Propulsion Unit----"
