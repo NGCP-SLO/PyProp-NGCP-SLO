@@ -83,6 +83,7 @@ class PropulsionUnit:
         # Determine torque
         return self.motor.Kt*self.motor.Gr*(self.I_motor-self.motor.I0)
     
+    
     def calc_cruise_thrust(self, v_cruise, throttle, max_iter=1000):
         """Computes thrust produced at a given cruise speed and throttle setting.
 
@@ -403,7 +404,6 @@ class PropulsionUnit:
 
         if P_elec <= 0:
             return 0.0
-
         return P_mech/P_elec
 
     def __str__(self):
