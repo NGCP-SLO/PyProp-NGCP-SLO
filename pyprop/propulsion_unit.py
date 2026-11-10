@@ -48,15 +48,13 @@ class PropulsionUnit:
 
     """
 
-    def __init__(self, prop, motor, battery, esc, altitude=0.0):
-        
+    def __init__(self, prop, motor, battery, esc, altitude=0.0, n_motors=1):
         self.prop = prop
         self.motor = motor
         self.batt = battery
         self.esc = esc
-
-        _,_,_,self._rho = statee(altitude)
-        
+        self.n_motors = n_motors
+        _,_,_,self._rho = statee(altitude)        
 
     def calc_motor_torque(self, throttle, revs):
         """Computes motor torque (ft*lbf) given throttle setting and revolutions (rpm).
@@ -78,8 +76,7 @@ class PropulsionUnit:
 
         # Determine motor current
         etaS = 1.0-0.078*(1.0-throttle)
-        self.I_motor = (etaS*throttle*self.batt.V0-(self.motor.Gr/self.motor.Kv)*revs)/(etaS*throttle*self.batt.R+self.esc.R+self.motor.R)
-
+        self.I_motor = (etaS*throttle*self.batt.V0-(self.motor.Gr/self.motor.Kv)*revs)/(etaS*throttle*self.batt.R*self.n_motors+self.esc.R+self.motor.R)
         # Determine torque
         return self.motor.Kt*self.motor.Gr*(self.I_motor-self.motor.I0)
     
@@ -325,18 +322,14 @@ class PropulsionUnit:
 
         """
 
-        # Calculate required throttle
-        throttle = self.calc_cruise_throttle(v_cruise, T_req)
-
-        # Check
+        throttle = self.calc_cruise_throttle(v_cruise, T_req/self.n_motors)
         self._check_current_draw()
 
-        # Determine the run time
-        run_time = (self.batt.capacity/1000.0)/self.I_motor*60.0 # Gives run time in minutes, assuming nominal cell capacity and constant battery votlage
+        I_batt = self.n_motors*self.I_motor
+        run_time = (self.batt.capacity/1000.0)/I_batt*60.0
         if run_time < 0:
             raise InvalidRuntimeError(run_time)
         return run_time, throttle
-
 
     def get_weight(self):
         """Returns weight of electrical components in pounds.
@@ -349,11 +342,10 @@ class PropulsionUnit:
             BladeElementProp.
 
         """
+        n = self.n_motors
         if isinstance(self.prop, BladeElementProp):
-            return (self.batt.weight + self.motor.weight + self.esc.weight)/16.0 + self.prop.weight
-        else:
-            return (self.batt.weight + self.motor.weight + self.esc.weight)/16.0
-
+            return (self.batt.weight + n*self.motor.weight + self.esc.weight)/16.0 + n*self.prop.weight
+        return (self.batt.weight + n*self.motor.weight + self.esc.weight)/16.0
 
     def get_electric_power(self):
         """Returns the power sourced by the battery for the last calculated condition.
@@ -364,8 +356,7 @@ class PropulsionUnit:
             Electrical power sourced in Watts.
 
         """
-        return self.I_motor*self.batt.V0
-
+        return self.n_motors*self.I_motor*self.batt.V0   # total battery power
 
     def get_figure_of_merit(self):
         """Returns the figure of merit for the propulsion unit at the last
@@ -418,9 +409,9 @@ class PropulsionUnit:
     def _check_current_draw(self):
         # Makes sure the current drawn does not exceed that allowed by any of the components
 
-        if self.I_motor > self.esc.I_max:
+        if self.I_motor > self.esc.I_max:                      # per ESC channel
             raise MaxCurrentExceededError("ESC", self.esc.name, self.esc.I_max, self.I_motor)
-        if self.I_motor > self.batt.I_max:
-            raise MaxCurrentExceededError("battery", self.batt.name, self.batt.I_max, self.I_motor)
-        if self.I_motor > self.motor.I_max:
+        if self.n_motors*self.I_motor > self.batt.I_max:       # whole pack
+            raise MaxCurrentExceededError("battery", self.batt.name, self.batt.I_max, self.n_motors*self.I_motor)
+        if self.I_motor > self.motor.I_max:                    # per motor
             raise MaxCurrentExceededError("motor", self.motor.name, self.motor.I_max, self.I_motor)
