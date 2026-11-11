@@ -371,6 +371,25 @@ class PropulsionUnit:
         """
         return self.prop.get_figure_of_merit(self._w, self._v)
     
+    def get_prop_efficiency(self):
+        """Returns the propeller efficiency at the last calculated flight condition.
+
+        At zero airspeed this is the figure of merit. Otherwise it is useful
+        propulsive power divided by shaft power, T*V/P = Ct*J/Cp.
+        """
+        w, V = self._w, self._v
+
+        if V == 0.0:
+            return self.prop.get_figure_of_merit(w, V)
+
+        Ct = self.prop.get_thrust_coef(w, V)
+        Cp = self.prop.get_power_coef(w, V)
+        J = self.prop.get_advance_ratio(w, V)
+
+        if Ct <= 0 or Cp <= 0 or not np.isfinite(J):
+            return np.nan  # windmilling or degenerate condition
+        return Ct*J/Cp
+    
     def get_motor_efficiency(self):
         """Returns the motor's electrical-to-mechanical efficiency for the last
         calculated flight condition (i.e. after calling calc_cruise_thrust,
